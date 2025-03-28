@@ -26,6 +26,51 @@ type commands struct {
 	cmds map[string]func(*state, command) error
 }
 
+func handlerFeeds(s *state, cmd command) error {
+	feeds, err := s.db.GetFeeds(context.Background())
+	if err != nil {
+		fmt.Println("ERROR GETTING FEEDS")
+		return err
+	}
+	for i := range feeds {
+		user, err := s.db.GetUserName(context.Background(), (feeds[i].UserID.UUID))
+		if err != nil {
+			fmt.Println("ERROR GETTING USER NAME")
+			return err
+		}
+		fmt.Printf("Feed Name: %v, URL: %v, User Name: %v\n", feeds[i].Name, feeds[i].Url, user)
+	}
+	return nil
+}
+
+func handlerAddFeed(s *state, cmd command) error {
+	if len(cmd.arguments) < 2 {
+		fmt.Println("ERROR: ADD FEED MUST SPECIFY BOTH NAME AND URL OF FEED")
+		os.Exit(1)
+	}
+	current_user, err := s.db.GetUser(context.Background(), s.cfg.Current_user_name)
+	user_id := current_user.ID
+	if err != nil {
+		fmt.Println("ERROR GETTING CURRENT USER")
+	}
+	entry, err := s.db.CreateFeedEntry(context.Background(), database.CreateFeedEntryParams{Name: cmd.arguments[0], Url: cmd.arguments[1], CreatedAt: time.Now(), UpdatedAt: time.Now(), UserID: uuid.NullUUID{UUID: user_id, Valid: true}})
+	if err != nil {
+		fmt.Printf("ERROR: %v", err)
+	}
+	fmt.Println(entry)
+	return nil
+}
+
+func handlerAgg(s *state, cmd command) error {
+	feed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	if err != nil {
+		fmt.Println("ERROR FETCHING FEED")
+		return err
+	}
+	fmt.Println(*feed)
+	return nil
+}
+
 func handlerUsers(s *state, cmd command) error {
 	users, err := s.db.GetUsers(context.Background())
 	if err != nil {
@@ -82,6 +127,10 @@ func handlerRegister(s *state, cmd command) error {
 
 func handlerReset(s *state, cmd command) error {
 	err := s.db.Reset(context.Background())
+	if err != nil {
+		fmt.Printf("ERROR:%v\n", err)
+	}
+	err = s.db.ResetFeed(context.Background())
 	if err != nil {
 		fmt.Printf("ERROR:%v\n", err)
 	}

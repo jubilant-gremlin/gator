@@ -29,6 +29,9 @@ func main() {
 	cmd_map.register("register", handlerRegister)
 	cmd_map.register("reset", handlerReset)
 	cmd_map.register("users", handlerUsers)
+	cmd_map.register("agg", handlerAgg)
+	cmd_map.register("addfeed", handlerAddFeed)
+	cmd_map.register("feeds", handlerFeeds)
 	// interpret cli args to command
 	args := os.Args
 	new_cmd := command{
