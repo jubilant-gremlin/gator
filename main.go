@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -10,6 +11,22 @@ import (
 
 	_ "github.com/lib/pq"
 )
+
+func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
+	return func(s *state, cmd command) error {
+		current_user, err := s.db.GetUser(context.Background(), s.cfg.Current_user_name)
+		if err != nil {
+			fmt.Printf("ERROR GETTING USER: %v", err)
+			return err
+		}
+		err = handler(s, cmd, current_user)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+}
 
 func main() {
 	cfg := config.Read()
@@ -30,8 +47,10 @@ func main() {
 	cmd_map.register("reset", handlerReset)
 	cmd_map.register("users", handlerUsers)
 	cmd_map.register("agg", handlerAgg)
-	cmd_map.register("addfeed", handlerAddFeed)
+	cmd_map.register("addfeed", middlewareLoggedIn(handlerAddFeed))
 	cmd_map.register("feeds", handlerFeeds)
+	cmd_map.register("follow", middlewareLoggedIn(handlerFollow))
+	cmd_map.register("following", middlewareLoggedIn(handlerFollowing))
 	// interpret cli args to command
 	args := os.Args
 	new_cmd := command{

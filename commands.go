@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -26,6 +27,42 @@ type commands struct {
 	cmds map[string]func(*state, command) error
 }
 
+func handlerFollowing(s *state, cmd command, user database.User) error {
+	user_id := user.ID
+	following, err := s.db.GetFeedFollowsForUser(context.Background(), uuid.NullUUID{UUID: user_id, Valid: true})
+	if err != nil {
+		fmt.Printf("ERROR GETTING FOLLOWS FOR USER: %v", err)
+	}
+	fmt.Printf("%v IS FOLLOWING:\n", user.Name)
+	for i := range following {
+		fmt.Printf("- %v\n", following[i].FeedName)
+	}
+	return nil
+}
+
+func handlerFollow(s *state, cmd command, user database.User) error {
+	if len(cmd.arguments) == 0 {
+		return errors.New("ERROR: FOLLOW COMMAND MUST SPECIFY FEED URL")
+	}
+	url := cmd.arguments[0]
+	user_id := user.ID
+	feed, err := s.db.GetFeed(context.Background(), url)
+	if err != nil {
+		fmt.Printf("ERROR GETTING FEED")
+		return err
+	}
+	feed_id := feed.ID
+	followed, err := s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{CreatedAt: time.Now(), UpdatedAt: time.Now(), UserID: uuid.NullUUID{UUID: user_id, Valid: true}, FeedID: sql.NullInt64{Int64: feed_id, Valid: true}})
+	if err != nil {
+		fmt.Printf("ERROR FOLLOWING FEED:%v\n", err)
+		return err
+	}
+	for i := range followed {
+		fmt.Printf("SUCCESS: %v FOLLOWED %v", followed[i].UserName, followed[i].FeedName)
+	}
+	return nil
+}
+
 func handlerFeeds(s *state, cmd command) error {
 	feeds, err := s.db.GetFeeds(context.Background())
 	if err != nil {
@@ -43,21 +80,23 @@ func handlerFeeds(s *state, cmd command) error {
 	return nil
 }
 
-func handlerAddFeed(s *state, cmd command) error {
+func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.arguments) < 2 {
 		fmt.Println("ERROR: ADD FEED MUST SPECIFY BOTH NAME AND URL OF FEED")
 		os.Exit(1)
 	}
-	current_user, err := s.db.GetUser(context.Background(), s.cfg.Current_user_name)
-	user_id := current_user.ID
-	if err != nil {
-		fmt.Println("ERROR GETTING CURRENT USER")
-	}
+	user_id := user.ID
 	entry, err := s.db.CreateFeedEntry(context.Background(), database.CreateFeedEntryParams{Name: cmd.arguments[0], Url: cmd.arguments[1], CreatedAt: time.Now(), UpdatedAt: time.Now(), UserID: uuid.NullUUID{UUID: user_id, Valid: true}})
 	if err != nil {
 		fmt.Printf("ERROR: %v", err)
 	}
-	fmt.Println(entry)
+	_, err = s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{CreatedAt: time.Now(), UpdatedAt: time.Now(), UserID: uuid.NullUUID{UUID: user_id, Valid: true}, FeedID: sql.NullInt64{Int64: entry.ID, Valid: true}})
+	if err != nil {
+		fmt.Printf("ERROR FOLLOWING FEED:%v\n", err)
+		return err
+	}
+
+	fmt.Printf("SUCCESS! %v WAS ADDED FOR %v", entry.Name, user.Name)
 	return nil
 }
 

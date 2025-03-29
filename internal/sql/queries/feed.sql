@@ -17,3 +17,7 @@ DELETE FROM feed *;
 -- name: GetFeeds :many
 
 SELECT name, url, user_id FROM feed;
+
+-- name: GetFeed :one
+
+SELECT * FROM feed WHERE url = $1;
