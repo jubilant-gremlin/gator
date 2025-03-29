@@ -27,6 +27,24 @@ type commands struct {
 	cmds map[string]func(*state, command) error
 }
 
+func handlerUnfollow(s *state, cmd command, user database.User) error {
+	user_id := user.ID
+	if len(cmd.arguments) == 0 {
+		return errors.New("ERROR: UNFOLLOW COMMAND MUST SPECIFY FEED URL")
+	}
+	url := cmd.arguments[0]
+	feed_to_delete, err := s.db.GetFeed(context.Background(), url)
+	if err != nil {
+		fmt.Printf("ERROR GETTING FEED: %v", err)
+	}
+	err = s.db.DeleteFeedFollow(context.Background(), database.DeleteFeedFollowParams{UserID: uuid.NullUUID{UUID: user_id, Valid: true}, FeedID: sql.NullInt64{Int64: feed_to_delete.ID, Valid: true}})
+	if err != nil {
+		fmt.Printf("ERROR DELETING FEED FROM FOLLOWS: %v\n", err)
+		os.Exit(1)
+	}
+	return nil
+}
+
 func handlerFollowing(s *state, cmd command, user database.User) error {
 	user_id := user.ID
 	following, err := s.db.GetFeedFollowsForUser(context.Background(), uuid.NullUUID{UUID: user_id, Valid: true})
