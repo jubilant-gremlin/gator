@@ -27,6 +27,30 @@ type commands struct {
 	cmds map[string]func(*state, command) error
 }
 
+func scrapeFeeds(s *state) {
+	next, err := s.db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		fmt.Printf("ERROR GETTING NEXT FEED TO FETCH: %v\n", err)
+		return
+	}
+	fmt.Printf("FETCHING FEED: %v\n", next.Url)
+	err = s.db.MarkFeedFetched(context.Background(), database.MarkFeedFetchedParams{LastFetchedAt: sql.NullTime{Time: time.Now(), Valid: true}, ID: next.ID})
+	if err != nil {
+		fmt.Printf("ERROR MARKING FEED AS FETCHED: %v\n", err)
+		return
+	}
+	fetched, err := fetchFeed(context.Background(), next.Url)
+	if err != nil {
+		fmt.Printf("ERROR FETCHING FEED: %v\n", err)
+		return
+	}
+	fmt.Printf("FEED: %v - %d posts found\n", next.Name, len(fetched.Channel.Item))
+	for i := range fetched.Channel.Item {
+		fmt.Printf("- %v\n", fetched.Channel.Item[i].Title)
+	}
+	fmt.Println()
+}
+
 func handlerUnfollow(s *state, cmd command, user database.User) error {
 	user_id := user.ID
 	if len(cmd.arguments) == 0 {
@@ -36,11 +60,12 @@ func handlerUnfollow(s *state, cmd command, user database.User) error {
 	feed_to_delete, err := s.db.GetFeed(context.Background(), url)
 	if err != nil {
 		fmt.Printf("ERROR GETTING FEED: %v", err)
+		return err
 	}
 	err = s.db.DeleteFeedFollow(context.Background(), database.DeleteFeedFollowParams{UserID: uuid.NullUUID{UUID: user_id, Valid: true}, FeedID: sql.NullInt64{Int64: feed_to_delete.ID, Valid: true}})
 	if err != nil {
 		fmt.Printf("ERROR DELETING FEED FROM FOLLOWS: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 	return nil
 }
@@ -50,6 +75,7 @@ func handlerFollowing(s *state, cmd command, user database.User) error {
 	following, err := s.db.GetFeedFollowsForUser(context.Background(), uuid.NullUUID{UUID: user_id, Valid: true})
 	if err != nil {
 		fmt.Printf("ERROR GETTING FOLLOWS FOR USER: %v", err)
+		return err
 	}
 	fmt.Printf("%v IS FOLLOWING:\n", user.Name)
 	for i := range following {
@@ -66,7 +92,7 @@ func handlerFollow(s *state, cmd command, user database.User) error {
 	user_id := user.ID
 	feed, err := s.db.GetFeed(context.Background(), url)
 	if err != nil {
-		fmt.Printf("ERROR GETTING FEED")
+		fmt.Printf("ERROR GETTING FEED: %v\n", err)
 		return err
 	}
 	feed_id := feed.ID
@@ -84,13 +110,13 @@ func handlerFollow(s *state, cmd command, user database.User) error {
 func handlerFeeds(s *state, cmd command) error {
 	feeds, err := s.db.GetFeeds(context.Background())
 	if err != nil {
-		fmt.Println("ERROR GETTING FEEDS")
+		fmt.Printf("ERROR GETTING FEEDS: %v\n", err)
 		return err
 	}
 	for i := range feeds {
 		user, err := s.db.GetUserName(context.Background(), (feeds[i].UserID.UUID))
 		if err != nil {
-			fmt.Println("ERROR GETTING USER NAME")
+			fmt.Printf("ERROR GETTING USER NAME: %v\n", err)
 			return err
 		}
 		fmt.Printf("Feed Name: %v, URL: %v, User Name: %v\n", feeds[i].Name, feeds[i].Url, user)
@@ -100,13 +126,13 @@ func handlerFeeds(s *state, cmd command) error {
 
 func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.arguments) < 2 {
-		fmt.Println("ERROR: ADD FEED MUST SPECIFY BOTH NAME AND URL OF FEED")
-		os.Exit(1)
+		return errors.New("ERROR: ADD FEED MUST SPECIFY BOTH NAME AND URL OF FEED")
 	}
 	user_id := user.ID
 	entry, err := s.db.CreateFeedEntry(context.Background(), database.CreateFeedEntryParams{Name: cmd.arguments[0], Url: cmd.arguments[1], CreatedAt: time.Now(), UpdatedAt: time.Now(), UserID: uuid.NullUUID{UUID: user_id, Valid: true}})
 	if err != nil {
 		fmt.Printf("ERROR: %v", err)
+		return err
 	}
 	_, err = s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{CreatedAt: time.Now(), UpdatedAt: time.Now(), UserID: uuid.NullUUID{UUID: user_id, Valid: true}, FeedID: sql.NullInt64{Int64: entry.ID, Valid: true}})
 	if err != nil {
@@ -114,17 +140,24 @@ func handlerAddFeed(s *state, cmd command, user database.User) error {
 		return err
 	}
 
-	fmt.Printf("SUCCESS! %v WAS ADDED FOR %v", entry.Name, user.Name)
+	fmt.Printf("SUCCESS! %v WAS ADDED FOR %v\n", entry.Name, user.Name)
 	return nil
 }
 
 func handlerAgg(s *state, cmd command) error {
-	feed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	if len(cmd.arguments) == 0 {
+		return errors.New("ERROR: AGG COMMAND MUST SPECIFY TIME DURATION")
+	}
+	time_between_reqs, err := time.ParseDuration(cmd.arguments[0])
 	if err != nil {
-		fmt.Println("ERROR FETCHING FEED")
+		fmt.Printf("ERROR PARSING TIME: %v\n", err)
 		return err
 	}
-	fmt.Println(*feed)
+	fmt.Printf("COLLECTING FEEDS EVERY %v\n", time_between_reqs)
+	ticker := time.NewTicker(time_between_reqs)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
+	}
 	return nil
 }
 
