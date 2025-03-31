@@ -7,10 +7,10 @@ For information on how to install Postgres, visit: [PostgreSQL](https://www.post
 For information on how to install Go, visit: [Go](https://go.dev/doc/install)  
   
 You will need to create a `.gatorconfig.json` file in your home directory. The format of the `.gatorconfig.json` should be as follows:  
-    `<
+    `{
         "db_url":"postgres://username:password@localhost:port/gator?sslmode=disable"
         "current_user_name":""
-     >`
+     }`
 Where username and password are the values you assigned when setting up PostgreSQL. For more information on setting up PostgreSQL, visit: [Microsoft](https://learn.microsoft.com/en-us/windows/wsl/tutorials/wsl-database#install-postgresql)  
 
 ## BUILDING AND INSTALLING GATOR
