@@ -28,7 +28,7 @@ Once gator is installed on your machine, you can run the application with `gator
 - `register <username>`: registers a new user in the database with the provided username, and logs in as that user.  
 - `reset`: resets all of the data in the database  
 - `users`: lists all users registered in the database  
-- `agg <timeBetweenRequests>`: aggregates posts from the users followed feeds with the given time between requests. Feeds never fetched will be aggregated firs, followed by oldest feeds first. Time must be in the format `<integer>s|m|h` e.g. 15s, 10m, 1h  
+- `agg <timeBetweenRequests>`: aggregates posts from the users followed feeds with the given time between requests. Feeds never fetched will be aggregated first, followed by oldest feeds first. Time must be in the format `<integer>s|m|h` e.g. 15s, 10m, 1h  
 - `addfeed <name> <url>`: adds a given feed as the logged in user, then follows that feed as the logged in user.  
 - `follow <url>`: follows the given feed as the logged in user.
 - `following`: displays the logged in user's currently followed feeds.
