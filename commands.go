@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -46,9 +47,51 @@ func scrapeFeeds(s *state) {
 	}
 	fmt.Printf("FEED: %v - %d posts found\n", next.Name, len(fetched.Channel.Item))
 	for i := range fetched.Channel.Item {
-		fmt.Printf("- %v\n", fetched.Channel.Item[i].Title)
+		pub, err := time.Parse(time.RFC1123Z, fetched.Channel.Item[i].PubDate)
+		if err != nil {
+			fmt.Printf("ERROR PARSING DATE:%v\n", err)
+		}
+		err = s.db.CreatePost(context.Background(), database.CreatePostParams{CreatedAt: time.Now(), UpdatedAt: time.Now(), Title: fetched.Channel.Item[i].Title, Url: fetched.Channel.Item[i].Link, Description: sql.NullString{String: fetched.Channel.Item[i].Description, Valid: true}, PublishedAt: sql.NullTime{Time: pub, Valid: true}, FeedID: sql.NullInt64{Int64: next.ID, Valid: true}})
+		if err != nil {
+			fmt.Printf("ERROR CREATING POST: %v\n", err)
+			return
+		}
 	}
 	fmt.Println()
+}
+
+func handlerBrowse(s *state, cmd command) error {
+	switch len(cmd.arguments) {
+	default:
+		limit, err := strconv.Atoi(cmd.arguments[0])
+		if err != nil {
+			fmt.Printf("ERROR GETTING POST LIMIT: %v\n", err)
+			return err
+		}
+		posts, err := s.db.GetPostsForUser(context.Background(), int32(limit))
+		if err != nil {
+			fmt.Printf("ERROR GETTING POSTS: %v\n", err)
+			return err
+		}
+		for i := range posts {
+			fmt.Println(posts[i].PublishedAt.Time)
+			fmt.Printf("%v:\n", posts[i].Title)
+			fmt.Println(posts[i].Description.String)
+		}
+		return nil
+	case 0:
+		posts, err := s.db.GetPostsForUser(context.Background(), 2)
+		if err != nil {
+			fmt.Printf("ERROR GETTING POSTS: %v\n", err)
+			return err
+		}
+		for i := range posts {
+			fmt.Println(posts[i].PublishedAt.Time)
+			fmt.Printf("%v:\n", posts[i].Title)
+			fmt.Println(posts[i].Description.String)
+		}
+		return nil
+	}
 }
 
 func handlerUnfollow(s *state, cmd command, user database.User) error {
@@ -219,10 +262,17 @@ func handlerReset(s *state, cmd command) error {
 	err := s.db.Reset(context.Background())
 	if err != nil {
 		fmt.Printf("ERROR:%v\n", err)
+		return err
 	}
 	err = s.db.ResetFeed(context.Background())
 	if err != nil {
 		fmt.Printf("ERROR:%v\n", err)
+		return err
+	}
+	err = s.db.ResetPosts(context.Background())
+	if err != nil {
+		fmt.Printf("ERROR: %v\n", err)
+		return err
 	}
 	fmt.Println("DATABASE RESET SUCCESSFUL")
 	return nil

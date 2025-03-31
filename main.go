@@ -52,6 +52,7 @@ func main() {
 	cmd_map.register("follow", middlewareLoggedIn(handlerFollow))
 	cmd_map.register("following", middlewareLoggedIn(handlerFollowing))
 	cmd_map.register("unfollow", middlewareLoggedIn(handlerUnfollow))
+	cmd_map.register("browse", handlerBrowse)
 	// interpret cli args to command
 	args := os.Args
 	new_cmd := command{
