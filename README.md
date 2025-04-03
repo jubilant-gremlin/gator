@@ -7,7 +7,8 @@ For information on how to install Postgres, visit: [PostgreSQL](https://www.post
 For information on how to install Go, visit: [Go](https://go.dev/doc/install)  
   
 You will need to create a `.gatorconfig.json` file in your home directory. The format of the `.gatorconfig.json` should be as follows:  
-    ```
+
+    ```json  
     {
         "db_url":"postgres://username:password@localhost:port/gator?sslmode=disable",
         "current_user_name":""
@@ -17,12 +18,13 @@ Where username and password are the values you assigned when setting up PostgreS
 
 ## BUILDING AND INSTALLING GATOR
 Assuming that Git and Go are installed; cloning, running, building, and installing the code can be done using the following commands:  
-    ```
+
+    ```bash
     $ git clone https://github.com/jubilant-gremlin/gator.git
     $ cd gator
     $ go build
     $ go install
-    ```
+    ```  
 
 The config file expects that you have a `postgres` instance running on the provided port with a `gator` database created. If issues are encountered while installing gator, please ensure all dependencies are satisified and that the `gator` database exists.  
 
